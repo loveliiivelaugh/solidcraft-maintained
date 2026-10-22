@@ -11,7 +11,7 @@ on:
         required: true
         default: security
         type: choice
-        options: [security, baseline-model-cache]
+        options: [security, baseline-model-cache, ci]
 permissions: {}
 concurrency:
   group: solidcraft-isolated-validation
@@ -72,7 +72,7 @@ jobs:
           echo "::$guard::"
           exit "$result"
       - name: SolidCraft workspace build
-        if: ${{ inputs.validation_scope != 'baseline-model-cache' && !cancelled() && success() }}
+        if: ${{ inputs.validation_scope == 'security' && !cancelled() && success() }}
         run: |
           guard=$(cat /proc/sys/kernel/random/uuid)
           echo "::stop-commands::$guard"
@@ -80,7 +80,7 @@ jobs:
           echo "::$guard::"
           exit "$result"
       - name: SolidCraft workspace tests
-        if: ${{ inputs.validation_scope != 'baseline-model-cache' && !cancelled() && success() }}
+        if: ${{ inputs.validation_scope == 'security' && !cancelled() && success() }}
         run: |
           guard=$(cat /proc/sys/kernel/random/uuid)
           echo "::stop-commands::$guard"
