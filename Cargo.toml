@@ -145,6 +145,8 @@ debug = "line-tables-only"
 
 # truck-shapeops with SolidCraft fixes (Apache-2.0, see vendor/truck-shapeops and ATTRIBUTION.md).
 [patch.crates-io]
+# RUSTSEC-2026-0197 and adjacent aliasing swaps; see vendor/README.md.
+cgmath = { path = "vendor/cgmath" }
 truck-geometry = { path = "vendor/truck-geometry" }
 truck-shapeops = { path = "vendor/truck-shapeops" }
 truck-stepio = { path = "vendor/truck-stepio" }

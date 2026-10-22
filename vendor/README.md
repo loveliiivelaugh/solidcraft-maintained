@@ -292,3 +292,14 @@ SolidCraft changes:
   and the frame is skipped with a repaint asked for when it is due. The streak and the deadline
   survive a recreate; a configure the device takes ends the streak, a recreate it asked for
   included. A recreate for a lost surface goes ahead as before.
+
+## cgmath 0.18.0 (Apache-2.0, The CGMath Developers, https://github.com/rustgd/cgmath)
+
+Source: crates.io cgmath 0.18.0, SHA-256 1a98d30140e3296250832bbaaff83b27dcd6fa3cc70fb6f1f3e5c9c0023b5317. The original LICENSE, source, build script and existing test files are retained.
+
+Changes (marked `SolidCraft:`):
+- `src/matrix.rs`: replace the three Matrix2/3/4 column swaps affected by RUSTSEC-2026-0197 with safe sequential copies. Equal indices cannot create two mutable references to the same object. Apply the same repair to the three adjacent element swaps.
+- `src/structure.rs`: repair Array::swap_elements with the same safe-copy pattern, covering the vector operations used by matrix row swaps. Copy bounds already exist; invalid indices still fail bounds checks.
+- `tests/matrix.rs`: exercise equal/distinct column, row and element swaps exhaustively for matrices of dimensions 2, 3 and 4. Run these under Miri as well as the normal test harness.
+
+This narrowly patches an unsound dependency; no first-party call to swap_columns was found. It does not make cgmath maintained, prove other cgmath code sound, or justify suppressing vendored-source advisory coverage. A migration away from cgmath requires a separate geometry compatibility project.
