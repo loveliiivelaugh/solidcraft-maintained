@@ -11,7 +11,7 @@ on:
         required: true
         default: security
         type: choice
-        options: [security, baseline-model-cache, ci, tests]
+        options: [security, baseline-model-cache, ci, tests, readiness-fast, readiness]
 permissions: {}
 concurrency:
   group: solidcraft-isolated-validation
@@ -109,5 +109,61 @@ jobs:
           guard=$(cat /proc/sys/kernel/random/uuid)
           echo "::stop-commands::$guard"
           set +e; bash /opt/maintained-harness/sandbox.sh tests; result=$?; set -e
+          echo "::$guard::"
+          exit "$result"
+      - name: Readiness fast gates and notice generation
+        if: ${{ inputs.validation_scope == 'readiness-fast' && !cancelled() && success() }}
+        run: |
+          guard=$(cat /proc/sys/kernel/random/uuid)
+          echo "::stop-commands::$guard"
+          set +e; bash /opt/maintained-harness/sandbox.sh readiness-fast; result=$?; set -e
+          echo "::$guard::"
+          exit "$result"
+      - name: Strict static checks
+        if: ${{ inputs.validation_scope == 'readiness' && !cancelled() && success() }}
+        run: |
+          guard=$(cat /proc/sys/kernel/random/uuid)
+          echo "::stop-commands::$guard"
+          set +e; bash /opt/maintained-harness/sandbox.sh static; result=$?; set -e
+          echo "::$guard::"
+          exit "$result"
+      - name: Compile workspace test binaries
+        if: ${{ inputs.validation_scope == 'readiness' && !cancelled() && success() }}
+        run: |
+          guard=$(cat /proc/sys/kernel/random/uuid)
+          echo "::stop-commands::$guard"
+          set +e; bash /opt/maintained-harness/sandbox.sh compile-tests; result=$?; set -e
+          echo "::$guard::"
+          exit "$result"
+      - name: Bounded workspace and documentation tests
+        if: ${{ inputs.validation_scope == 'readiness' && !cancelled() && success() }}
+        run: |
+          guard=$(cat /proc/sys/kernel/random/uuid)
+          echo "::stop-commands::$guard"
+          set +e; bash /opt/maintained-harness/sandbox.sh bounded-tests; result=$?; set -e
+          echo "::$guard::"
+          exit "$result"
+      - name: Wasm compatibility checks
+        if: ${{ inputs.validation_scope == 'readiness' && !cancelled() && success() }}
+        run: |
+          guard=$(cat /proc/sys/kernel/random/uuid)
+          echo "::stop-commands::$guard"
+          set +e; bash /opt/maintained-harness/sandbox.sh wasm; result=$?; set -e
+          echo "::$guard::"
+          exit "$result"
+      - name: Browser offline smoke
+        if: ${{ inputs.validation_scope == 'readiness' && !cancelled() && success() }}
+        run: |
+          guard=$(cat /proc/sys/kernel/random/uuid)
+          echo "::stop-commands::$guard"
+          set +e; bash /opt/maintained-harness/sandbox.sh browser; result=$?; set -e
+          echo "::$guard::"
+          exit "$result"
+      - name: Desktop and CLI build smoke
+        if: ${{ inputs.validation_scope == 'readiness' && !cancelled() && success() }}
+        run: |
+          guard=$(cat /proc/sys/kernel/random/uuid)
+          echo "::stop-commands::$guard"
+          set +e; bash /opt/maintained-harness/sandbox.sh desktop-smoke; result=$?; set -e
           echo "::$guard::"
           exit "$result"
