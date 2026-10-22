@@ -1,8 +1,9 @@
-//! `cargo xtask test`: build the workspace's tests once, then run every test binary at the same
-//! time. `cargo test` runs them one after another, so one slow binary held up all the others;
-//! the doc tests and any other `side` jobs run alongside on their own thread.
+//! Build the workspace tests once, then run a bounded number of binaries concurrently.
+//! Geometry includes a strict timing assertion, so run that binary without competing jobs.
+//! Run doc/wasm side jobs afterward, without oversubscribing CPU or memory.
 
 use std::process::{Command, Stdio};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::mpsc;
 use std::time::Instant;
 
@@ -16,43 +17,63 @@ struct TestBin {
 }
 
 /// Build the tests with `cargo_args` (e.g. `--locked`), run each binary with `test_args`, and run
-/// the `side` jobs one after another meanwhile. Each prints a line when it ends; a failure prints
+/// the `side` jobs one after another afterward. Each prints a line when it ends; a failure prints
 /// its whole output.
 pub fn run(cargo_args: &[&str], test_args: &[&str], side: Vec<(String, Command)>) -> Result<(), String> {
-    let bins = build(cargo_args)?;
+    let mut bins = build(cargo_args)?;
+    let count = bins.len();
     let start = Instant::now();
-    let (tx, rx) = mpsc::channel::<(String, Result<String, String>, f64)>();
     let mut failed = Vec::new();
+    let execute = |b: &TestBin| {
+        let mut c = Command::new(&b.exe);
+        c.args(test_args).current_dir(&b.dir).env("CARGO_MANIFEST_DIR", &b.dir).env("RUST_TEST_THREADS", "2");
+        finish(c)
+    };
+    // Keep the existing 200 ms performance assertion, without other test binaries
+    // or background compilation competing for its CPU time.
+    if let Some(index) = bins.iter().position(|b| b.label == "geom lib solidcraft_geom") {
+        let b = bins.remove(index);
+        let t0 = Instant::now();
+        report(&b.label, execute(&b), t0.elapsed().as_secs_f64(), &mut failed);
+    }
+    let workers = std::thread::available_parallelism().map(usize::from).unwrap_or(1).min(2);
+    println!("test: {count} binaries, at most {workers} concurrent; geometry runs first, side jobs last");
+    let next = AtomicUsize::new(0);
+    let (tx, rx) = mpsc::channel::<(String, Result<String, String>, f64)>();
     std::thread::scope(|scope| {
-        for b in &bins {
+        for _ in 0..workers {
             let tx = tx.clone();
+            let bins = &bins;
+            let next = &next;
+            let execute = &execute;
             scope.spawn(move || {
-                let t0 = Instant::now();
-                let mut c = Command::new(&b.exe);
-                c.args(test_args).current_dir(&b.dir).env("CARGO_MANIFEST_DIR", &b.dir);
-                let _ = tx.send((b.label.clone(), finish(c), t0.elapsed().as_secs_f64()));
+                while let Some(b) = bins.get(next.fetch_add(1, Ordering::Relaxed)) {
+                    let t0 = Instant::now();
+                    let _ = tx.send((b.label.clone(), execute(b), t0.elapsed().as_secs_f64()));
+                }
             });
         }
-        let tx_side = tx.clone();
-        scope.spawn(move || {
-            for (label, c) in side {
-                let t0 = Instant::now();
-                let _ = tx_side.send((label, finish(c), t0.elapsed().as_secs_f64()));
-            }
-        });
         drop(tx);
         for (label, result, secs) in rx {
-            match result {
-                Ok(summary) => println!("ok    {label:<44} {secs:6.1}s  {summary}"),
-                Err(output) => {
-                    println!("FAIL  {label:<44} {secs:6.1}s\n{output}");
-                    failed.push(label);
-                }
-            }
+            report(&label, result, secs, &mut failed);
         }
     });
-    println!("test: {} binaries in {:.1}s", bins.len(), start.elapsed().as_secs_f64());
+    for (label, command) in side {
+        let t0 = Instant::now();
+        report(&label, finish(command), t0.elapsed().as_secs_f64(), &mut failed);
+    }
+    println!("test: {count} binaries in {:.1}s", start.elapsed().as_secs_f64());
     if failed.is_empty() { Ok(()) } else { Err(format!("failed: {}", failed.join(", "))) }
+}
+
+fn report(label: &str, result: Result<String, String>, secs: f64, failed: &mut Vec<String>) {
+    match result {
+        Ok(summary) => println!("ok    {label:<44} {secs:6.1}s  {summary}"),
+        Err(output) => {
+            println!("FAIL  {label:<44} {secs:6.1}s\n{output}");
+            failed.push(label.to_string());
+        }
+    }
 }
 
 /// Run to the end: the last `test result:` line on success, all output on failure.
