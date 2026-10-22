@@ -35,6 +35,40 @@ PY
  miri)
    cargo +nightly miri test --manifest-path vendor/cgmath/Cargo.toml --locked --offline --test matrix swapping_equal_and_distinct_matrix_indices
    ;;
+ readiness-fast)
+   cargo +1.95.0 fmt --all -- --check
+   cargo +1.95.0 clippy --workspace --all-targets --profile ci --locked --offline -- -D warnings
+   cargo +1.95.0 test -p solidcraft-geom --lib --profile ci --locked --offline tests::a_long_helical_tangent_chain_is_found_quickly -- --exact --test-threads=1
+   cargo +1.95.0 xtask licences
+   python3 - <<'PYNOTICE'
+import base64,hashlib,pathlib
+p=pathlib.Path('THIRD-PARTY-LICENSES.txt').read_bytes()
+print('MAINTAINED_NOTICE_SHA256='+hashlib.sha256(p).hexdigest())
+print('MAINTAINED_NOTICE_BASE64='+base64.b64encode(p).decode())
+PYNOTICE
+   ;;
+ static)
+   cargo +1.95.0 fmt --all -- --check
+   for gate in assets icons licences lists layers ui-containers; do cargo +1.95.0 xtask "$gate" --check; done
+   cargo +1.95.0 clippy --workspace --all-targets --profile ci --locked --offline -- -D warnings
+   ;;
+ compile-tests)
+   cargo +1.95.0 test --workspace --profile ci --locked --offline --no-run
+   ;;
+ bounded-tests)
+   xvfb-run -a cargo +1.95.0 xtask test --locked
+   ;;
+ wasm)
+   cargo +1.95.0 xtask wasm
+   ;;
+ browser)
+   cargo +1.95.0 xtask web-offline-test
+   ;;
+ desktop-smoke)
+   cargo +1.95.0 build --profile ci --locked --offline -p solidcraft -p solidcraft-cli
+   target/ci/solidcraft --help
+   target/ci/solidcraft-cli --help
+   ;;
  tests)
    xvfb-run -a cargo +1.95.0 xtask test --locked -- --test-threads=3
    ;;
