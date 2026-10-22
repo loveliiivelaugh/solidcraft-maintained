@@ -1,0 +1,91 @@
+name: Isolated SolidCraft validation
+on:
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Full reviewed commit in loveliiivelaugh/solidcraft-maintained
+        required: true
+        type: string
+permissions: {}
+concurrency:
+  group: solidcraft-isolated-validation
+  cancel-in-progress: false
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    permissions: {}
+    steps:
+      - name: Fetch trusted harness
+        env:
+          HARNESS_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          sudo mkdir -p /opt/maintained-harness
+          for script in prepare.py sandbox.sh task.sh; do
+            curl --fail --location --retry 3 "https://raw.githubusercontent.com/loveliiivelaugh/solidcraft-maintained/$HARNESS_SHA/.maintained/validation/$script" -o "/tmp/$script"
+            sudo install -m 0755 "/tmp/$script" "/opt/maintained-harness/$script"
+          done
+      - name: Provision disposable VM tools
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends pkg-config clang cmake ninja-build libudev-dev libasound2-dev libxkbcommon-dev libwayland-dev libx11-dev libxrandr-dev libxi-dev libgl1-mesa-dev libdbus-1-dev libgtk-3-dev xvfb xauth mesa-vulkan-drivers libvulkan1
+          sudo env RUSTUP_HOME=/opt/maintained-rustup CARGO_HOME=/opt/maintained-cargo /home/runner/.cargo/bin/rustup toolchain install 1.95.0 --profile minimal --component rustfmt,clippy --target wasm32-unknown-unknown
+          sudo env RUSTUP_HOME=/opt/maintained-rustup CARGO_HOME=/opt/maintained-cargo /home/runner/.cargo/bin/rustup toolchain install nightly --profile minimal --component miri
+          sudo mkdir -p /opt/maintained-cargo/bin
+          sudo cp /home/runner/.cargo/bin/rustup /opt/maintained-cargo/bin/rustup
+          for tool in cargo rustc rustdoc rustfmt cargo-fmt clippy-driver cargo-clippy cargo-miri; do sudo ln -sf rustup "/opt/maintained-cargo/bin/$tool"; done
+          sudo useradd --system --home-dir /var/lib/solidcraft/home --shell /usr/sbin/nologin solidcraft-build
+          sudo mkdir -p /var/lib/solidcraft/{home,cargo,runtime}
+          sudo chmod 0700 /var/lib/solidcraft/runtime
+      - name: Fetch pinned public source
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        run: |
+          sudo --preserve-env=SOURCE_SHA python3 /opt/maintained-harness/prepare.py
+          sudo chown -R solidcraft-build:solidcraft-build /var/lib/solidcraft
+      - name: Prefetch locked dependencies
+        run: bash /opt/maintained-harness/sandbox.sh prefetch
+      - name: Verify isolation boundary
+        run: bash /opt/maintained-harness/sandbox.sh isolation
+      - name: Matrix regression tests
+        if: ${{ !cancelled() && success() }}
+        run: |
+          guard=$(cat /proc/sys/kernel/random/uuid)
+          echo "::stop-commands::$guard"
+          set +e; bash /opt/maintained-harness/sandbox.sh matrix; result=$?; set -e
+          echo "::$guard::"
+          exit "$result"
+      - name: Miri aliasing regression
+        if: ${{ !cancelled() && success() }}
+        run: |
+          guard=$(cat /proc/sys/kernel/random/uuid)
+          echo "::stop-commands::$guard"
+          set +e; bash /opt/maintained-harness/sandbox.sh miri; result=$?; set -e
+          echo "::$guard::"
+          exit "$result"
+      - name: SolidCraft workspace build
+        if: ${{ !cancelled() && success() }}
+        run: |
+          guard=$(cat /proc/sys/kernel/random/uuid)
+          echo "::stop-commands::$guard"
+          set +e; bash /opt/maintained-harness/sandbox.sh build; result=$?; set -e
+          echo "::$guard::"
+          exit "$result"
+      - name: SolidCraft workspace tests
+        if: ${{ !cancelled() && success() }}
+        run: |
+          guard=$(cat /proc/sys/kernel/random/uuid)
+          echo "::stop-commands::$guard"
+          set +e; bash /opt/maintained-harness/sandbox.sh test; result=$?; set -e
+          echo "::$guard::"
+          exit "$result"
+      - name: Full repository CI gates
+        if: ${{ !cancelled() && success() }}
+        run: |
+          guard=$(cat /proc/sys/kernel/random/uuid)
+          echo "::stop-commands::$guard"
+          set +e; bash /opt/maintained-harness/sandbox.sh ci; result=$?; set -e
+          echo "::$guard::"
+          exit "$result"
