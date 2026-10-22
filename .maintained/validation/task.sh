@@ -12,7 +12,12 @@ case "$1" in
 import os,socket,pathlib
 assert os.getuid()!=0
 assert not any(k in os.environ for k in ['GITHUB_TOKEN','GH_TOKEN','ACTIONS_RUNTIME_TOKEN','AWS_ACCESS_KEY_ID','SSH_AUTH_SOCK'])
-assert not pathlib.Path('/home/runner').exists() or not os.access('/home/runner',os.R_OK)
+try:
+    list(pathlib.Path('/home/runner').iterdir())
+except (PermissionError, FileNotFoundError):
+    print('PASS: runner home inaccessible')
+else:
+    raise SystemExit('FAIL: runner home readable')
 try:
     socket.create_connection(('1.1.1.1',443),timeout=2)
 except OSError:
