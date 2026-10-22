@@ -36,20 +36,27 @@ PY
    cargo +nightly miri test --manifest-path vendor/cgmath/Cargo.toml --locked --offline --test matrix swapping_equal_and_distinct_matrix_indices
    ;;
  readiness-fast)
-   cargo +1.95.0 fmt --all -- --check
-   cargo +1.95.0 clippy --workspace --all-targets --profile ci --locked --offline -- -D warnings
-   cargo +1.95.0 test -p solidcraft-geom --lib --profile ci --locked --offline tests::a_long_helical_tangent_chain_is_found_quickly -- --exact --test-threads=1
+   cp THIRD-PARTY-LICENSES.txt /tmp/maintained-original-notices.txt
    cargo +1.95.0 xtask licences
    python3 - <<'PYNOTICE'
 import base64,hashlib,pathlib
 p=pathlib.Path('THIRD-PARTY-LICENSES.txt').read_bytes()
 print('MAINTAINED_NOTICE_SHA256='+hashlib.sha256(p).hexdigest())
-print('MAINTAINED_NOTICE_BASE64='+base64.b64encode(p).decode())
+encoded=base64.b64encode(p).decode()
+for i in range(0,len(encoded),4096):
+    print('MAINTAINED_NOTICE_CHUNK='+encoded[i:i+4096])
 PYNOTICE
+   cp /tmp/maintained-original-notices.txt THIRD-PARTY-LICENSES.txt
+   cargo +1.95.0 fmt --all -- --check
+   cargo +1.95.0 clippy --workspace --all-targets --profile ci --locked --offline -- -D warnings
+   cargo +1.95.0 test -p solidcraft-geom --lib --profile ci --locked --offline tests::a_long_helical_tangent_chain_is_found_quickly -- --exact --test-threads=1
    ;;
  static)
    cargo +1.95.0 fmt --all -- --check
    for gate in assets icons licences lists layers ui-containers; do cargo +1.95.0 xtask "$gate" --check; done
+   cp THIRD-PARTY-LICENSES.txt /tmp/maintained-original-notices.txt
+   cargo +1.95.0 xtask licences
+   cmp /tmp/maintained-original-notices.txt THIRD-PARTY-LICENSES.txt
    cargo +1.95.0 clippy --workspace --all-targets --profile ci --locked --offline -- -D warnings
    ;;
  compile-tests)
