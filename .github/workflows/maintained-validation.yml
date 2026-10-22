@@ -14,7 +14,7 @@ on:
         options: [security, baseline-model-cache, ci, tests, readiness-fast, readiness, macos-readiness]
 permissions: {}
 concurrency:
-  group: solidcraft-isolated-validation
+  group: solidcraft-isolated-validation-${{ inputs.validation_scope == 'macos-readiness' && 'macos' || 'linux' }}
   cancel-in-progress: false
 jobs:
   validate:
@@ -34,10 +34,15 @@ jobs:
             sudo install -m 0755 "/tmp/$script" "/opt/maintained-harness/$script"
           done
       - name: Provision disposable VM tools
+        timeout-minutes: 10
         run: |
           set -euo pipefail
-          sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends pkg-config clang cmake ninja-build libudev-dev libasound2-dev libxkbcommon-dev libwayland-dev libx11-dev libxrandr-dev libxi-dev libgl1-mesa-dev libdbus-1-dev libgtk-3-dev xvfb xauth mesa-vulkan-drivers libvulkan1
+          # The Azure mirror throttled the previous attempt for 15 minutes before source execution.
+          if [[ -f /etc/apt/apt-mirrors.txt ]]; then
+            sudo sed -i 's|http://azure.archive.ubuntu.com/ubuntu|https://archive.ubuntu.com/ubuntu|g' /etc/apt/apt-mirrors.txt
+          fi
+          sudo apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 update -qq
+          sudo apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 install -y --no-install-recommends pkg-config clang cmake ninja-build libudev-dev libasound2-dev libxkbcommon-dev libwayland-dev libx11-dev libxrandr-dev libxi-dev libgl1-mesa-dev libdbus-1-dev libgtk-3-dev xvfb xauth mesa-vulkan-drivers libvulkan1
           sudo env RUSTUP_HOME=/opt/maintained-rustup CARGO_HOME=/opt/maintained-cargo /home/runner/.cargo/bin/rustup toolchain install 1.95.0 --no-self-update --profile minimal --component rustfmt,clippy --target wasm32-unknown-unknown
           sudo env RUSTUP_HOME=/opt/maintained-rustup CARGO_HOME=/opt/maintained-cargo /home/runner/.cargo/bin/rustup toolchain install nightly --no-self-update --profile minimal --component miri,rust-src
           sudo mkdir -p /opt/maintained-cargo/bin
@@ -47,12 +52,14 @@ jobs:
           sudo mkdir -p /var/lib/solidcraft/{home,cargo,runtime}
           sudo chmod 0700 /var/lib/solidcraft/runtime
       - name: Fetch pinned public source
+        timeout-minutes: 5
         env:
           SOURCE_SHA: ${{ inputs.source_sha }}
         run: |
           sudo --preserve-env=SOURCE_SHA python3 /opt/maintained-harness/prepare.py
           sudo chown -R solidcraft-build:solidcraft-build /var/lib/solidcraft
       - name: Prefetch locked dependencies
+        timeout-minutes: 10
         run: bash /opt/maintained-harness/sandbox.sh prefetch
       - name: Verify isolation boundary
         run: bash /opt/maintained-harness/sandbox.sh isolation
@@ -185,14 +192,17 @@ jobs:
             sudo install -m 0755 "/tmp/$script" "/opt/maintained-harness/$script"
           done
       - name: Provision macOS tools and isolated UID
+        timeout-minutes: 10
         run: bash /opt/maintained-harness/macos.sh provision
       - name: Fetch pinned macOS source
+        timeout-minutes: 5
         env:
           SOURCE_SHA: ${{ inputs.source_sha }}
         run: |
           sudo --preserve-env=SOURCE_SHA python3 /opt/maintained-harness/prepare.py
           sudo chown -R solidcraft-build:staff /var/lib/solidcraft
       - name: Prefetch locked macOS dependencies
+        timeout-minutes: 10
         run: bash /opt/maintained-harness/macos.sh prefetch
       - name: Verify macOS isolation boundary
         run: bash /opt/maintained-harness/macos.sh isolation
