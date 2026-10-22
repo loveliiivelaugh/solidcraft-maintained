@@ -3,9 +3,11 @@ set -euo pipefail
 case "$1" in
  prefetch)
    cargo +1.95.0 fetch --locked
-   cargo +1.95.0 generate-lockfile --manifest-path vendor/cgmath/Cargo.toml
-   cargo +1.95.0 fetch --manifest-path vendor/cgmath/Cargo.toml --locked
-   cargo +nightly miri setup
+   if [[ -d vendor/cgmath ]]; then
+     cargo +1.95.0 generate-lockfile --manifest-path vendor/cgmath/Cargo.toml
+     cargo +1.95.0 fetch --manifest-path vendor/cgmath/Cargo.toml --locked
+     cargo +nightly miri setup
+   fi
    ;;
  isolation)
    python3 - <<'PY'
@@ -32,6 +34,9 @@ PY
    ;;
  miri)
    cargo +nightly miri test --manifest-path vendor/cgmath/Cargo.toml --locked --offline --test matrix swapping_equal_and_distinct_matrix_indices
+   ;;
+ baseline-model-cache)
+   cargo +1.95.0 test -p solidcraft-cli --test model_cache --profile ci --locked --offline -- --test-threads=3
    ;;
  build)
    cargo +1.95.0 build --workspace --profile ci --locked --offline

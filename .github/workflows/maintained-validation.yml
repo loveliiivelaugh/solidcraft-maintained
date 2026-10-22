@@ -6,6 +6,12 @@ on:
         description: Full reviewed commit in loveliiivelaugh/solidcraft-maintained
         required: true
         type: string
+      validation_scope:
+        description: Full candidate or targeted unchanged-source comparison
+        required: true
+        default: security
+        type: choice
+        options: [security, baseline-model-cache]
 permissions: {}
 concurrency:
   group: solidcraft-isolated-validation
@@ -50,7 +56,7 @@ jobs:
       - name: Verify isolation boundary
         run: bash /opt/maintained-harness/sandbox.sh isolation
       - name: Matrix regression tests
-        if: ${{ !cancelled() && success() }}
+        if: ${{ inputs.validation_scope != 'baseline-model-cache' && !cancelled() && success() }}
         run: |
           guard=$(cat /proc/sys/kernel/random/uuid)
           echo "::stop-commands::$guard"
@@ -58,7 +64,7 @@ jobs:
           echo "::$guard::"
           exit "$result"
       - name: Miri aliasing regression
-        if: ${{ !cancelled() && success() }}
+        if: ${{ inputs.validation_scope != 'baseline-model-cache' && !cancelled() && success() }}
         run: |
           guard=$(cat /proc/sys/kernel/random/uuid)
           echo "::stop-commands::$guard"
@@ -66,7 +72,7 @@ jobs:
           echo "::$guard::"
           exit "$result"
       - name: SolidCraft workspace build
-        if: ${{ !cancelled() && success() }}
+        if: ${{ inputs.validation_scope != 'baseline-model-cache' && !cancelled() && success() }}
         run: |
           guard=$(cat /proc/sys/kernel/random/uuid)
           echo "::stop-commands::$guard"
@@ -74,7 +80,7 @@ jobs:
           echo "::$guard::"
           exit "$result"
       - name: SolidCraft workspace tests
-        if: ${{ !cancelled() && success() }}
+        if: ${{ inputs.validation_scope != 'baseline-model-cache' && !cancelled() && success() }}
         run: |
           guard=$(cat /proc/sys/kernel/random/uuid)
           echo "::stop-commands::$guard"
@@ -82,10 +88,18 @@ jobs:
           echo "::$guard::"
           exit "$result"
       - name: Full repository CI gates
-        if: ${{ !cancelled() && success() }}
+        if: ${{ inputs.validation_scope != 'baseline-model-cache' && !cancelled() && success() }}
         run: |
           guard=$(cat /proc/sys/kernel/random/uuid)
           echo "::stop-commands::$guard"
           set +e; bash /opt/maintained-harness/sandbox.sh ci; result=$?; set -e
+          echo "::$guard::"
+          exit "$result"
+      - name: Baseline model-cache regression
+        if: ${{ inputs.validation_scope == 'baseline-model-cache' && !cancelled() && success() }}
+        run: |
+          guard=$(cat /proc/sys/kernel/random/uuid)
+          echo "::stop-commands::$guard"
+          set +e; bash /opt/maintained-harness/sandbox.sh baseline-model-cache; result=$?; set -e
           echo "::$guard::"
           exit "$result"
