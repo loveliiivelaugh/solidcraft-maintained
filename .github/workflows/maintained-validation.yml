@@ -11,13 +11,14 @@ on:
         required: true
         default: security
         type: choice
-        options: [security, baseline-model-cache, ci, tests, readiness-fast, readiness]
+        options: [security, baseline-model-cache, ci, tests, readiness-fast, readiness, macos-readiness]
 permissions: {}
 concurrency:
   group: solidcraft-isolated-validation
   cancel-in-progress: false
 jobs:
   validate:
+    if: ${{ inputs.validation_scope != 'macos-readiness' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     permissions: {}
@@ -167,3 +168,59 @@ jobs:
           set +e; bash /opt/maintained-harness/sandbox.sh desktop-smoke; result=$?; set -e
           echo "::$guard::"
           exit "$result"
+  macos:
+    if: ${{ inputs.validation_scope == 'macos-readiness' }}
+    runs-on: macos-14
+    timeout-minutes: 60
+    permissions: {}
+    steps:
+      - name: Fetch trusted macOS harness
+        env:
+          HARNESS_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          sudo mkdir -p /opt/maintained-harness
+          for script in prepare.py macos.sh; do
+            curl --fail --location --retry 3 "https://raw.githubusercontent.com/loveliiivelaugh/solidcraft-maintained/$HARNESS_SHA/.maintained/validation/$script" -o "/tmp/$script"
+            sudo install -m 0755 "/tmp/$script" "/opt/maintained-harness/$script"
+          done
+      - name: Provision macOS tools and isolated UID
+        run: bash /opt/maintained-harness/macos.sh provision
+      - name: Fetch pinned macOS source
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        run: |
+          sudo --preserve-env=SOURCE_SHA python3 /opt/maintained-harness/prepare.py
+          sudo chown -R solidcraft-build:staff /var/lib/solidcraft
+      - name: Prefetch locked macOS dependencies
+        run: bash /opt/maintained-harness/macos.sh prefetch
+      - name: Verify macOS isolation boundary
+        run: bash /opt/maintained-harness/macos.sh isolation
+      - name: Apple Silicon build and CLI smoke
+        run: |
+          guard=$(uuidgen)
+          echo "::stop-commands::$guard"
+          set +e; bash /opt/maintained-harness/macos.sh build; result=$?; set -e
+          echo "::$guard::"
+          exit "$result"
+      - name: Package public native build
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/maintained-native
+          for binary in solidcraft solidcraft-cli; do
+            cp "/var/lib/solidcraft/source/target/aarch64-apple-darwin/ci/$binary" /tmp/maintained-native/
+          done
+          cp /var/lib/solidcraft/source/THIRD-PARTY-LICENSES.txt /var/lib/solidcraft/source/LICENSE-MIT /var/lib/solidcraft/source/LICENSE-APACHE /var/lib/solidcraft/source/NOTICE /tmp/maintained-native/
+          printf '%s\n' "$SOURCE_SHA" > /tmp/maintained-native/SOURCE_COMMIT
+          cd /tmp/maintained-native
+          shasum -a 256 solidcraft solidcraft-cli THIRD-PARTY-LICENSES.txt > SHA256SUMS
+          tar -czf /tmp/solidcraft-macos-arm64.tar.gz solidcraft solidcraft-cli THIRD-PARTY-LICENSES.txt LICENSE-MIT LICENSE-APACHE NOTICE SOURCE_COMMIT SHA256SUMS
+      - name: Upload reviewed native build
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: solidcraft-macos-arm64
+          path: /tmp/solidcraft-macos-arm64.tar.gz
+          compression-level: 0
+          retention-days: 7
