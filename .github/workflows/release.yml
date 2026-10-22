@@ -24,11 +24,12 @@ on:
     - cron: '0 0 * * *'
       timezone: America/New_York
   push:
-    branches: [release]
+    branches: [ release ]
   workflow_dispatch:
     inputs:
       draft:
-        description: "Create/update a draft (release branch only; off: build artifacts only)"
+        description: "Create/update a draft (release branch only; off: build artifacts
+          only)"
         type: boolean
         default: false
 
@@ -82,12 +83,13 @@ jobs:
           case "$VERSION" in *-*) pre=true ;; *) pre=false ;; esac
           { echo "version=$VERSION"; echo "date=$(date -u +%Y-%m-%d)"; echo "prerelease=$pre"; } >>"$GITHUB_OUTPUT"
           echo "### SolidCraft v$VERSION (\`${GITHUB_SHA::9}\`)" >>"$GITHUB_STEP_SUMMARY"
+    if: ${{ false }}
 
   # The app icon in every size, drawn by solidcraft-cli (no image files are committed), for the
   # Windows jobs: the ARM64 build is cross-compiled and can't run there to draw its own.
   icons:
     needs: version
-    if: needs.version.outputs.build == 'true'
+    if: ${{ false }}
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -108,7 +110,7 @@ jobs:
   linux:
     name: Linux ${{ matrix.arch }}
     needs: version
-    if: needs.version.outputs.build == 'true'
+    if: ${{ false }}
     # The oldest GitHub-hosted image, so the binaries only need glibc >= 2.35.
     runs-on: ${{ matrix.runner }}
     strategy:
@@ -163,8 +165,8 @@ jobs:
 
   flatpak:
     name: Flatpak ${{ matrix.arch }}
-    needs: [version, linux]
-    if: needs.version.outputs.build == 'true'
+    needs: [ version, linux ]
+    if: ${{ false }}
     # Repackages the Linux job's tarball (the same binaries as the AppImage/deb/rpm); no Rust
     # build here. 24.04 for a newer flatpak-builder than 22.04 ships.
     runs-on: ${{ matrix.runner }}
@@ -190,19 +192,19 @@ jobs:
           # Ubuntu 24.04's AppArmor blocks the unprivileged user namespaces bubblewrap needs.
           sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
       - name: Build the Flatpak bundle
-        run: packaging/linux/flatpak-bundle.sh "dist/linux/solidcraft-$SOLIDCRAFT_VERSION-linux-${{ matrix.arch }}.tar.gz"
+        run: packaging/linux/flatpak-bundle.sh
+          "dist/linux/solidcraft-$SOLIDCRAFT_VERSION-linux-${{ matrix.arch
+          }}.tar.gz"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: release-flatpak-${{ matrix.arch }}
           path: dist/release/*.flatpak
           if-no-files-found: error
 
-
-
   snap:
     name: Snap ${{ matrix.arch }}
-    needs: [version, linux]
-    if: needs.version.outputs.build == 'true'
+    needs: [ version, linux ]
+    if: ${{ false }}
     # Repackages the Linux job's tarball, like the Flatpak. On 24.04 because the core24 base is
     # Ubuntu 24.04, which lets snapcraft build on the runner itself (--destructive-mode).
     runs-on: ${{ matrix.runner }}
@@ -255,7 +257,7 @@ jobs:
   freebsd:
     name: FreeBSD x86_64
     needs: version
-    if: needs.version.outputs.build == 'true'
+    if: ${{ false }}
     # GitHub has no FreeBSD runners: build in a FreeBSD 14.3 VM.
     runs-on: ubuntu-latest
     timeout-minutes: 180
@@ -296,7 +298,7 @@ jobs:
   macos:
     name: macOS universal
     needs: version
-    if: needs.version.outputs.build == 'true'
+    if: ${{ false }}
     runs-on: macos-14
     env:
       SOLIDCRAFT_VERSION: ${{ needs.version.outputs.version }}
@@ -319,8 +321,8 @@ jobs:
 
   windows:
     name: Windows ${{ matrix.arch }}
-    needs: [version, icons]
-    if: needs.version.outputs.build == 'true'
+    needs: [ version, icons ]
+    if: ${{ false }}
     runs-on: windows-latest
     strategy:
       fail-fast: false
@@ -363,7 +365,7 @@ jobs:
   web:
     name: Web (wasm)
     needs: version
-    if: needs.version.outputs.build == 'true'
+    if: ${{ false }}
     runs-on: ubuntu-latest
     env:
       SOLIDCRAFT_VERSION: ${{ needs.version.outputs.version }}
@@ -390,8 +392,8 @@ jobs:
 
   release:
     name: GitHub Release or dry-run artifacts
-    needs: [version, linux, flatpak, snap, freebsd, macos, windows, web]
-    if: needs.version.outputs.build == 'true'
+    needs: [ version, linux, flatpak, snap, freebsd, macos, windows, web ]
+    if: ${{ false }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -468,7 +470,8 @@ jobs:
           gh release edit "$tag" --draft=false --prerelease --latest=false
           echo "### Published nightly: $tag (\`${GITHUB_SHA::9}\`)" >>"$GITHUB_STEP_SUMMARY"
       - name: Create or update the draft release
-        if: github.ref == 'refs/heads/release' && (github.event_name == 'push' || inputs.draft)
+        if: github.ref == 'refs/heads/release' && (github.event_name == 'push' ||
+          inputs.draft)
         working-directory: artifacts
         run: |
           tag="v$VERSION"
@@ -520,8 +523,9 @@ jobs:
           fi
       - name: Upload the snaps to the Snap Store
         if: >-
-          steps.snapstore.outputs.configured == 'true' && (github.event_name == 'schedule' ||
-          (github.ref == 'refs/heads/release' && (github.event_name == 'push' || inputs.draft)))
+          steps.snapstore.outputs.configured == 'true' && (github.event_name ==
+          'schedule' || (github.ref == 'refs/heads/release' &&
+          (github.event_name == 'push' || inputs.draft)))
         env:
           SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
         working-directory: artifacts

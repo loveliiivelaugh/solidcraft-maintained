@@ -5,13 +5,13 @@ name: Kernel paused
 
 on:
   issues:
-    types: [opened]
+    types: [ opened ]
   # pull_request_target so PRs from forks can be labelled. It runs the base branch's
   # scripts/kernel-paused and only lists the PR's changed paths; the PR's code is never checked out.
   pull_request_target:
-    types: [opened]
+    types: [ opened ]
   discussion:
-    types: [created]
+    types: [ created ]
 
 permissions:
   contents: read # to check out scripts/kernel-paused
@@ -20,7 +20,8 @@ permissions:
   discussions: write
 
 concurrency:
-  group: kernel-paused-${{ github.event.issue.number || github.event.pull_request.number || github.event.discussion.number }}
+  group: kernel-paused-${{ github.event.issue.number ||
+    github.event.pull_request.number || github.event.discussion.number }}
   cancel-in-progress: false
 
 jobs:
@@ -40,3 +41,4 @@ jobs:
               ? await paused.handleDiscussion({ github, context })
               : await paused.handleOpened({ github, context });
             core.info(done);
+    if: ${{ false }}

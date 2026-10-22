@@ -5,7 +5,7 @@ name: Snap Store
 
 on:
   release:
-    types: [released]
+    types: [ released ]
   workflow_dispatch:
 
 permissions:
@@ -38,3 +38,4 @@ jobs:
           snapcraft status solidcraft
           snapcraft promote solidcraft --from-channel=latest/candidate --to-channel=latest/stable --yes
           snapcraft status solidcraft
+    if: ${{ false }}

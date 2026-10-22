@@ -8,7 +8,8 @@ on:
   workflow_dispatch:
     inputs:
       cases:
-        description: "Case directories (space separated); empty = every case whose source is FreeCAD"
+        description: "Case directories (space separated); empty = every case whose
+          source is FreeCAD"
         type: string
         default: ""
 
@@ -45,3 +46,4 @@ jobs:
           path: |
             tests/oracle/*/expected.json
             tests/oracle/*/reference.stl
+    if: ${{ false }}
