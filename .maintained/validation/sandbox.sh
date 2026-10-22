@@ -4,7 +4,7 @@ phase=$1
 network=yes
 offline=true
 runtime=3000
-if [[ "$phase" == ci ]]; then runtime=4800; fi
+if [[ "$phase" == ci || "$phase" == tests ]]; then runtime=4800; fi
 if [[ "$phase" == prefetch ]]; then network=no; offline=false; fi
 sudo systemd-run --quiet --wait --pipe --collect --unit="maintained-${phase}" \
   -p User=solidcraft-build -p Group=solidcraft-build \

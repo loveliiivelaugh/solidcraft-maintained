@@ -35,6 +35,9 @@ PY
  miri)
    cargo +nightly miri test --manifest-path vendor/cgmath/Cargo.toml --locked --offline --test matrix swapping_equal_and_distinct_matrix_indices
    ;;
+ tests)
+   xvfb-run -a cargo +1.95.0 xtask test --locked -- --test-threads=3
+   ;;
  baseline-model-cache)
    cargo +1.95.0 test -p solidcraft-cli --test model_cache --profile ci --locked --offline -- --test-threads=3
    ;;

@@ -11,7 +11,7 @@ on:
         required: true
         default: security
         type: choice
-        options: [security, baseline-model-cache, ci]
+        options: [security, baseline-model-cache, ci, tests]
 permissions: {}
 concurrency:
   group: solidcraft-isolated-validation
@@ -88,7 +88,7 @@ jobs:
           echo "::$guard::"
           exit "$result"
       - name: Full repository CI gates
-        if: ${{ inputs.validation_scope != 'baseline-model-cache' && !cancelled() && success() }}
+        if: ${{ (inputs.validation_scope == 'security' || inputs.validation_scope == 'ci') && !cancelled() && success() }}
         run: |
           guard=$(cat /proc/sys/kernel/random/uuid)
           echo "::stop-commands::$guard"
@@ -101,5 +101,13 @@ jobs:
           guard=$(cat /proc/sys/kernel/random/uuid)
           echo "::stop-commands::$guard"
           set +e; bash /opt/maintained-harness/sandbox.sh baseline-model-cache; result=$?; set -e
+          echo "::$guard::"
+          exit "$result"
+      - name: Complete workspace test collection
+        if: ${{ inputs.validation_scope == 'tests' && !cancelled() && success() }}
+        run: |
+          guard=$(cat /proc/sys/kernel/random/uuid)
+          echo "::stop-commands::$guard"
+          set +e; bash /opt/maintained-harness/sandbox.sh tests; result=$?; set -e
           echo "::$guard::"
           exit "$result"
