@@ -13,16 +13,25 @@ name: Docker
 
 on:
   push:
-    branches: [main]
+    branches: [ main ]
     # The image holds the web app only: documentation, test data and the GitHub bots' scripts can't
     # change it, so a push touching only those builds nothing (edge stays at the last code change).
     # ATTRIBUTION.md is the exception among the Markdown files: the app embeds it (Help, About).
     # The last matching pattern wins.
-    paths: ["**", "!docs/**", "!**/*.md", "ATTRIBUTION.md", "!tests/**", "!scripts/claim/**", "!scripts/triage/**"]
+    paths:
+      [
+        "**",
+        "!docs/**",
+        "!**/*.md",
+        "ATTRIBUTION.md",
+        "!tests/**",
+        "!scripts/claim/**",
+        "!scripts/triage/**"
+      ]
   release:
-    types: [published]
+    types: [ published ]
   pull_request:
-    paths: ["packaging/docker/**", ".github/workflows/docker.yml"]
+    paths: [ "packaging/docker/**", ".github/workflows/docker.yml" ]
   workflow_dispatch:
 
 permissions:
@@ -38,7 +47,7 @@ env:
 
 jobs:
   image:
-    if: ${{ !github.event.repository.private }}
+    if: ${{ false }} # Maintained: imported job disabled; original condition remains in source history.
     runs-on: ubuntu-latest
     timeout-minutes: 60
     permissions:
@@ -64,7 +73,8 @@ jobs:
       - name: Image name
         id: image
         # Registry names are lower case; a fork's owner may not be.
-        run: echo "name=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/solidcraft-web" >> "$GITHUB_OUTPUT"
+        run: echo "name=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/solidcraft-web" >>
+          "$GITHUB_OUTPUT"
       - uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
         id: meta
         with:
