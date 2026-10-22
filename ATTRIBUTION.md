@@ -560,3 +560,7 @@ A frame whose meshes the GPU refuses to stage (device lost or out of memory) is
 skipped with a warning instead of panicking (#1469).
 Paint callbacks are prepared only after a drawable is acquired, so a skipped
 surface frame cannot strand cached meshes without their GPU initialization.
+
+## Vendored matrix safety patch
+
+`vendor/cgmath` retains cgmath 0.18.0 from https://github.com/rustgd/cgmath (The CGMath Developers), under its original Apache-2.0 LICENSE. Safe-copy swaps repair RUSTSEC-2026-0197 and adjacent aliasing patterns; provenance and modifications are recorded in vendor/README.md. No images or other assets are copied.
