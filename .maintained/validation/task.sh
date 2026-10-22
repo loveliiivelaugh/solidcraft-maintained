@@ -56,7 +56,7 @@ PYNOTICE
    cargo +1.95.0 test --workspace --profile ci --locked --offline --no-run
    ;;
  bounded-tests)
-   xvfb-run -a cargo +1.95.0 xtask test --locked -- --test-threads=2
+   xvfb-run -a cargo +1.95.0 xtask test --locked
    ;;
  wasm)
    cargo +1.95.0 xtask wasm
