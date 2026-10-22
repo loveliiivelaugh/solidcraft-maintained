@@ -24,9 +24,9 @@ pub fn run(cargo_args: &[&str], test_args: &[&str], side: Vec<(String, Command)>
     let count = bins.len();
     let start = Instant::now();
     let mut failed = Vec::new();
-    let execute = |b: &TestBin| {
+    let execute = |b: &TestBin, threads: &str| {
         let mut c = Command::new(&b.exe);
-        c.args(test_args).current_dir(&b.dir).env("CARGO_MANIFEST_DIR", &b.dir).env("RUST_TEST_THREADS", "2");
+        c.args(test_args).current_dir(&b.dir).env("CARGO_MANIFEST_DIR", &b.dir).env("RUST_TEST_THREADS", threads);
         finish(c)
     };
     // Keep the existing 200 ms performance assertion, without other test binaries
@@ -34,7 +34,7 @@ pub fn run(cargo_args: &[&str], test_args: &[&str], side: Vec<(String, Command)>
     if let Some(index) = bins.iter().position(|b| b.label == "geom lib solidcraft_geom") {
         let b = bins.remove(index);
         let t0 = Instant::now();
-        report(&b.label, execute(&b), t0.elapsed().as_secs_f64(), &mut failed);
+        report(&b.label, execute(&b, "1"), t0.elapsed().as_secs_f64(), &mut failed);
     }
     let workers = std::thread::available_parallelism().map(usize::from).unwrap_or(1).min(2);
     println!("test: {count} binaries, at most {workers} concurrent; geometry runs first, side jobs last");
@@ -49,7 +49,7 @@ pub fn run(cargo_args: &[&str], test_args: &[&str], side: Vec<(String, Command)>
             scope.spawn(move || {
                 while let Some(b) = bins.get(next.fetch_add(1, Ordering::Relaxed)) {
                     let t0 = Instant::now();
-                    let _ = tx.send((b.label.clone(), execute(b), t0.elapsed().as_secs_f64()));
+                    let _ = tx.send((b.label.clone(), execute(b, "2"), t0.elapsed().as_secs_f64()));
                 }
             });
         }
