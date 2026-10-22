@@ -26,12 +26,15 @@ case "$phase" in
 (deny network*)
 PROFILE
    sudo install -m 0644 /tmp/maintained-offline.sb /opt/maintained-harness/offline.sb
+   sed 's/(deny network\*)/(allow network*)/' /tmp/maintained-offline.sb > /tmp/maintained-prefetch.sb
+   sudo install -m 0644 /tmp/maintained-prefetch.sb /opt/maintained-harness/prefetch.sb
    ;;
  prefetch|isolation|build)
    developer_dir=$(xcode-select -p)
    script=/opt/maintained-harness/macos.sh
+   cd "$root/source"
    if [[ "$phase" == prefetch ]]; then
-     sudo -u solidcraft-build /usr/bin/env -i HOME="$root/home" CARGO_HOME="$root/cargo" RUSTUP_HOME=/opt/maintained-rustup PATH=/opt/maintained-cargo/bin:/usr/bin:/bin TMPDIR="$root/tmp" DEVELOPER_DIR="$developer_dir" /bin/bash "$script" fetch-inner
+     sudo -u solidcraft-build /usr/bin/env -i HOME="$root/home" CARGO_HOME="$root/cargo" RUSTUP_HOME=/opt/maintained-rustup PATH=/opt/maintained-cargo/bin:/usr/bin:/bin TMPDIR="$root/tmp" DEVELOPER_DIR="$developer_dir" /usr/bin/sandbox-exec -f /opt/maintained-harness/prefetch.sb /bin/bash "$script" fetch-inner
    else
      sudo -u solidcraft-build /usr/bin/env -i HOME="$root/home" CARGO_HOME="$root/cargo" RUSTUP_HOME=/opt/maintained-rustup PATH=/opt/maintained-cargo/bin:/usr/bin:/bin TMPDIR="$root/tmp" DEVELOPER_DIR="$developer_dir" CARGO_BUILD_JOBS=3 CARGO_INCREMENTAL=0 CARGO_NET_OFFLINE=true MACOSX_DEPLOYMENT_TARGET=14.0 /usr/bin/sandbox-exec -f /opt/maintained-harness/offline.sb /bin/bash "$script" "$phase-inner"
    fi
@@ -41,18 +44,17 @@ PROFILE
    cargo +1.95.0 fetch --locked --target aarch64-apple-darwin
    ;;
  isolation-inner)
-   /usr/bin/python3 - <<'PY'
-import os,pathlib,socket
+   /usr/bin/python3 -c 'import os,pathlib,socket
 assert os.getuid()==59999
-assert not any(k in os.environ for k in ['GH_TOKEN','GITHUB_TOKEN','ACTIONS_RUNTIME_TOKEN','SSH_AUTH_SOCK'])
-try:list(pathlib.Path('/Users/runner').iterdir())
+assert not any(k in os.environ for k in ["GH_TOKEN","GITHUB_TOKEN","ACTIONS_RUNTIME_TOKEN","SSH_AUTH_SOCK"])
+try:list(pathlib.Path("/Users/runner").iterdir())
 except (PermissionError,FileNotFoundError):pass
-else:raise SystemExit('runner home is readable')
-try:socket.create_connection(('1.1.1.1',443),timeout=2)
+else:raise SystemExit("runner home is readable")
+try:socket.create_connection(("1.1.1.1",443),timeout=2)
 except OSError:pass
-else:raise SystemExit('outbound networking is available')
-print('PASS: macOS unprivileged UID, clean environment, protected runner home, denied network')
-PY
+else:raise SystemExit("outbound networking is available")
+print("PASS: macOS unprivileged UID, clean environment, protected runner home, denied network")
+'
    ;;
  build-inner)
    ulimit -t 2400
